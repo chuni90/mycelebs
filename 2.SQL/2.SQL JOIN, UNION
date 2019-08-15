@@ -1,0 +1,154 @@
+## JOIN ~ ON
+
+# 관계형 데이터베이스에서 서로 다른 Table을 연결하는 함수
+# 아래처럼 데이터베이스명이 길다면 공백(space) 1칸(=AS)으로 약칭을 만들 수 있다.
+# 이 약칭은 특이하게 SELECT에서 바로 사용이 가능함. sum, avg, count로 만든 AS 약칭은 사용되지 않는데..
+# ON은 JOIN 뒤에 따라오는 것이며, Table 간의 공통 col를 지정해주는 역할
+
+SELECT teams.conference AS conference,
+       AVG(players.weight) AS ave_weight
+ FROM benn.college_football_players players
+ JOIN benn.college_football_teams teams
+   ON teams.school_name = players.school_name
+Group BY teams.conference
+ORDER BY AVG(players.weight) DESC
+
+*tip
+SELECT players.*,  → players(약칭) table의 전체 열을 보여달라
+       temas.conference → teams table에서 conference만 가져와라
+
+# JOIN은 1)Inner join(=Join), 2)LEFT join 3)Right join 4)Outer join으로 나뉜다.
+# inner join은 JOIN과 같고, 이는 '교집합'의 특성을 가진다. 
+[JOIN별 개념 설명](http://joins.spathon.com/)  
+
+1)Inner join(=교집합)
+  예를 들어, KEY변수를 통해 A table에도 있고, B table에도 있는 것만 join 시킨다.
+  한쪽에만 있으면 결과 quary에 포함시키지 않음.
+
+2)Left join
+  왼쪽(From table)에 있고 오른쪽에 없으면 왼쪽값(row)를 가져옴
+  반대로 오른쪽에 있고 왼쪽에 없으면 안 가져옴.
+  
+Q. Count the number of unique companies (don't double-count companies) and unique acquired companies by state. 
+Do not include results for which there is no state data, and order by the number of acquired companies from highest to lowest.
+
+SELECT com.state_code,
+       COUNT(DISTINCT com.permalink) AS com_unique,
+       COUNT(DISTINCT acq.company_permalink) AS acq_unique
+ FROM tutorial.crunchbase_companies com
+ LEFT JOIN tutorial.crunchbase_acquisitions acq  # 왼쪽(com table)에 있으면 모두 가져와
+   ON com.permalink = acq.company_permalink
+ WHERE com.state_code IS NOT NULL                # com table의 state_code 값이 NULL이 아닌 것만 선택
+ GROUP by 1
+ ORDER BY acq_unique DESC
+
+
+3)Right join : LEFT join의 반대 개념
+
+4)FULL join(=Outer join, 합집합)
+  왼쪽, 오른쪽 table의 일치 value 상관없이 모든 row를 가져옴
+
+SELECT COUNT(CASE WHEN c.permalink IS NOT NULL AND i1.company_permalink IS NULL THEN 1 END) AS c_only,
+       COUNT(CASE WHEN c.permalink IS NOT NULL AND i1.company_permalink IS NOT NULL THEN 1 END) AS both,
+       COUNT(CASE WHEN c.permalink IS NULL AND i1.company_permalink IS NOT NULL THEN 1 END) AS i1_only
+FROM tutorial.crunchbase_companies c
+FULL JOIN tutorial.crunchbase_investments_part1 i1
+ON c.permalink = i1.company_permalink
+
+
+<---------------JOIN 응용은 다양하게 quary를 테스트 해보지 못함. 노트북 성능이 못따라가서..---------------->
+# JOIN 응용 : joins Using WHERE or ON (아래 예제에선 AND가 WHERE 처럼 실행된다고 설명함)
+  - ON + AND/OR 조합 : table이 join되기 전에 필터링 (ON 조건문에 조건을 추가하는 개념)
+                       ▶ 조건이 있으면 보다 더 빠르게 quary가 실행되는 경향이 있음!!
+
+  - ON + WHERE 조합  : table이 join된 후에 필터링
+
+
+# 설명 : 현재 data에서 '1000memories'라는 회사는 두 테이블 모두에 있음.
+         그런데 현재 JOIN 되기 전에 한 쪽의 테이블에서 필터링(WHERE)을 하고 싶어서,
+         ON 뒤에 AND를 붙여서 '천메모리즈'를 제외하고 JOIN해라 라고 명령한 것임.
+ ...
+ FROM tutorial.crunchbase_companies companies
+  LEFT JOIN tutorial.crunchbase_acquisitions acquisitions
+    ON companies.permalink = acquisitions.company_permalink
+   AND acquisitions.company_permalink != '/company/1000memories'  
+   ## AND를 통해서 JOIN 되기전에 필터링 시도, 
+      위 quary는 acq table에서 1000메모리의 data는 미리 안 붙이겠다고 한 것
+   
+   [결과 예시]
+   |company | acquisiton|
+   ----------------------
+   |100 FUN       | 1 |
+   |1000 memories |   |  
+   |1004 album    | 3 |
+ ...
+  FROM tutorial.crunchbase_companies companies
+  LEFT JOIN tutorial.crunchbase_acquisitions acquisitions
+    ON companies.permalink = acquisitions.company_permalink
+ WHERE acquisitions.company_permalink != '/company/1000memories'
+   ## WHERE을 통해서 JOIN 이후에 필터링
+      위 quary는 이미 다 join 된 이후에 아예 딱 해당 row를 where로 필터링 한 것
+   
+   [예시]
+   | 100 fun    | 1 |
+   | 1004 album | 3 |
+
+-------------------------------자체 TALBE에서  JOIN 해보기 ----------------
+이게 필요한 이유는 같은 칼럼에 2개 이상의 조건 + 또 다른 조건 등
+복합적인 조건을 걸 때 유용함
+
+아래 quary는 1개의 investments_part1을 japan과 gb(Great British)로 분리하고,
+각 테이블에 서로 다른 조건을 걸어서 산출한다. 
+
+SELECT japan.company_name,
+       japan.company_permalink, japan.investor_country_code, japan.funded_at
+ From tutorial.crunchbase_investments_part1 japan
+ JOIN tutorial.crunchbase_investments_part1 gb
+  ON japan.company_name = gb.company_name   
+  AND gb.investor_country_code = 'GBR'         ▶ gb에서 수출국가가 GBR이면서, 
+  AND gb.funded_at > japan.funded_at              펀드 기간이 japna보다 앞서는 것을 join하고
+  WHERE japan.investor_country_code = 'JPN'       join이후에 japan에서 수출국가 JPN인 것만 추출
+  ORDER BY 1
+  
+  
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------------
+
+# UNION
+
+UNION은 서로 다른 TABLE을 하나로 합치는 함수. JOIN은 연결고리(key columns)를 통해 테이블을 연결짓는 함수.
+
+# UNION 특징
+1) 합치려는 테이블의 columns의 수가 동일해야함(명칭이 굳이 100% 동일할 필요는 없음)
+2) 두 table의 동일한 columns엔 동일한 data type이어야 함
+3) UNION은 합쳐지는 두 테이블에 동일한 row가 있으면 1개의 row만 반환
+   - UNION ALL은 동일해도 모두 show
+   
+Q. 'companies' table을 기준으로 두 개의 Table을 산출하는데,
+    1번 칼럼은 data가 어느 table에서 왔는지를, 2번째는 status, 3번째는 investor 숫자
+
+SELECT 'investments_part1' AS dataset_name,  # ← dataset_name에 'value'를 지정해서 col을 만듦
+       companies.status,
+       COUNT(DISTINCT investments.investor_permalink) AS investors
+  FROM tutorial.crunchbase_companies companies
+  LEFT JOIN tutorial.crunchbase_investments_part1 investments
+    ON companies.permalink = investments.company_permalink
+ GROUP BY 1,2
+
+ UNION ALL
+ 
+ SELECT 'investments_part2' AS dataset_name,
+       companies.status,
+       COUNT(DISTINCT investments.investor_permalink) AS investors
+  FROM tutorial.crunchbase_companies companies
+  LEFT JOIN tutorial.crunchbase_investments_part2 investments
+    ON companies.permalink = investments.company_permalink
+ GROUP BY 1,2   
+-------------------------------------------------------------------------------------
+

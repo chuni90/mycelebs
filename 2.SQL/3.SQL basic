@@ -1,0 +1,176 @@
+[교육 사이트 : https://mode.com/resources/sql-tutorial]
+
+### Aggregate functions, Aggregators
+# Aggregator은 오직 columns에게만 적용되는 함수, row엔 적용 불가
+# select - from - where - group by - having - order by 순으로만 코딩 가능
+
+## COUNT  
+# count() 괄호 안에는 * 입력하면 전체 raw 개수, 칼럼이 들어가면 해당 칼럼의 raw 개수가 반환
+# SELECT절 안 에서 수식 계산이 가능함
+
+# Q. 각 칼럼별 null 값의 개수를 구해라 (3555는 전체 row 개수)
+
+SELECT 3555- COUNT(date) AS count_of_date,
+       3555- COUNT(year) AS count_of_year,
+       3555- COUNT(month) AS count_of_month,
+       3555- COUNT(open) AS count_of_open,
+       3555- COUNT(high) AS count_of_high,
+       3555- COUNT(low) AS count_of_low,
+       3555- COUNT(close) AS count_of_close,
+       3555- COUNT(volume) AS count_of_volume
+ FROM tutorial.aapl_historical_stock_price
+----------------------------------------------------------------------------------
+## SUM
+# SUM은 오직 숫자형, 이산형 변수에서만 사용 가능(명목, 서열척도 사용 불가)
+# SUM은 NULL 값을 0으로 계산
+
+# Q. open칼럼의 평균을 구하라
+
+SELECT SUM(open)/COUNT(open) AS ave_open
+  FROM tutorial.aapl_historical_stock_price
+  
+# Q. 각 연도 내 월별로 주가의 최저가, 최고가를 산출해라. (시간순서로 정렬)
+
+SELECT year, month,
+       MIN(low) AS LOW,
+       MAX(high) AS HIGH
+ FROM tutorial.aapl_historical_stock_price
+ GROUP BY year, month
+ ORDER BY year, month
+-------------------------------------------------------------------------------------
+
+## MAX, MIN
+# MAX, MIN은 SUM과 다르게 숫자형이 아닌 변수에도 적용이 가능하다. 
+# MIN, MAX 모두 가장 높거나 낮은 [숫자, 일자, 문자순서(알파벳)]을 반환해준다.
+
+# Q. 가장 큰 증가폭은 얼마인가?
+  
+SELECT MAX(close - open) AS highest_v
+ FROM tutorial.aapl_historical_stock_price
+------------------------------------------------------------------------------------- 
+
+## AVERAGE
+# 칼럼의 평균을 산출
+# 한계로는 NULL값을 Ignore(무시) 한다는 것, 즉 1나누는 분모의 개수가 줄어든다.
+# NULL 0으로 계산하려면 다음 시간에..
+
+# Q. volume의 평균은 얼마인가?
+
+SELECT AVG(volume) 
+ FROM tutorial.aapl_historical_stock_price
+ WHERE high is NOT NULL    /*<- 이건 있으나 마나한 조건, 어차피 평균은 NULL을 무시함*/ 
+
+-------------------------------------------------------------------------------------
+
+## Group BY
+# 칼럼을 묶어서 그룹핑하여 결과를 집계 (중복된 칼럼의 값을 1개로 해서 표현, 엑셀 피벗테이블의 행에 해당한다)
+# 아래 예시코드 처럼 ORDER BY랑도 같이 사용 가능(순서는 Group by 다음에 Order by)
+# query문을 다 실행하고 나서 마지막에 LIMIT를 실행하기 때문에 값이 잘려질 일은 없다(상식적인거임)
+
+# Q. year, month를 그룹화하여 총 데이터 개수를 산출하고, 월-년도 오름차순으로 정렬기준 적용
+
+SELECT year, 
+       month,
+       COUNT(*) AS Count
+ FROM tutorial.aapl_historical_stock_price
+ GROUP BY month, year 
+ ORDER BY month, year
+ LIMIT 1000
+ 
+ # P.S 특이하게 select(이하 S) 함수와 group by(이하 G) 함수가 불러오는 변수엔 관계가 있음
+ # S에 가, 나 변수가 있다면 G는 반드시 가, 나를 포함해야하며 변수 추가는 가능함
+ # S (가, 나) / G (가) >> 에러
+ # S (가, 나) / G (가, 나) >> OK
+ # S (가, 나) / G (가, 나 , 다) >> OK
+ # S (가, 나, **COUNT(다)) / G (가, 나) >> OK
+-------------------------------------------------------------------------------------
+
+## Having
+# SELECT를 통해 새로 뽑은(보이게끔만든) 칼럼은 where 함수가 인식을 못한다(실제로 없으므로)
+# 그래서 어떤 필터링 조건을 걸려면 HAVING 함수를 통해 걸어야 한다.
+
+# Q. 연도, 월로 그룹핑하여 high 변수의 max값이 400이상인 것을 연, 월 순서대로 정렬해서 산출
+
+SELECT year,
+       month,
+       MAX(high) AS month_high
+  FROM tutorial.aapl_historical_stock_price
+ GROUP BY year, month
+HAVING MAX(high) > 400   /* Where 절에는 적용이 어려움 */
+ ORDER BY year, month
+-------------------------------------------------------------------------------------
+
+## DISTINCT
+# SELECT DISTICNT로 사용하며, 칼럼의 고유값만 반환(중복된 값은 안 보여줌)
+# 아까 group by가 엑셀피벗의 행 역할이라면, Distinct는 엑셀피벗의 '열' 역할임
+# 본격적인 쿼리 작성 전에 이것저것 데이터를 살펴볼 때 사용하기 좋음
+# COUNT, SUM, AVG 등 함수와 함께 사용하기 좋음 → COUNT/SUM/AVG (DISTINCT 변수명) 
+# 그런데 DISTINCT는 쿼리 실행속도를 느려지게 하는 경향이 있음
+
+# Q. 각 year별로 month unique values의 개수를 산출해라
+
+SELECT year,
+       COUNT(DISTINCT month)
+FROM tutorial.aapl_historical_stock_price
+GROUP BY year
+-------------------------------------------------------------------------------------
+
+## CASE WHEN 조건1 THEN (TRUE 실행) ELSE (FALSE실행) END
+# 일반적인 IF 문이랑 같은 성격
+# 무조건 종료는 END를 써줘서 해줘야함. ELSE의 사용은 선택사항임
+# WHEN 다음에 오는 조건에는 AND, OR을 같이 사용 가능
+
+# Q. hometown에서  california가 들어가면 'yes'를 넣고, 이를 새로운 변수로 만든 후, 정렬을 이 변수로 해라 
+
+SELECT hometown, player_name,
+       CASE WHEN hometown ILIKE 'california%' THEN 'yes'
+            ELSE NULL END AS home_cali
+ FROM benn.college_football_players
+ order by home_cali
+
+
+# Q. FR, Not FR의 개수를 카운트해라
+
+SELECT CASE WHEN year = 'FR' THEN 'FR'
+            ELSE 'Not FR' END AS year_group,
+            COUNT(1) AS count
+  FROM benn.college_football_players
+ GROUP BY CASE WHEN year = 'FR' THEN 'FR'
+               ELSE 'Not FR' END
+               
+# Q. 4개의 조건을 카운트해라
+
+ SELECT CASE WHEN year = 'FR' THEN 'FR'
+            WHEN year = 'SO' THEN 'SO'
+            WHEN year = 'JR' THEN 'JR'
+            WHEN year = 'SR' THEN 'SR'
+            ELSE 'No Year Data' END AS year_group,
+            COUNT(1) AS count
+  FROM benn.college_football_players
+ GROUP BY year_group
+
+# Q. state 별로 region 칼럼을 만들고, 총계를 칼럼에 추가, 무게가 300lb 이상만 카운
+# 그룹핑은 region으로
+
+SELECT CASE WHEN state IN ('CA','OR','WA') THEN 'west'
+            WHEN state = 'TX'  THEN 't'
+            ELSE 'other' END AS regions,
+            COUNT(*)
+ FROM benn.college_football_players
+ WHERE weight >= 300   /* Operator(like, where 등)는 함수가 적용된 변수는 읽지 못함 */
+ GRoup by regions      /* aggregator(group, sum 등)은 함수 적용 변수 읽을 수 있음
+ 
+ 
+ # Q. state을 행으로, year value와 state 총계가 열로, 정렬은 state 총계 내림차순
+ 
+ SELECT state,
+       COUNT (CASE WHEN year = 'FR' THEN 'FR' END) AS fr_c,
+       COUNT (CASE WHEN year = 'SO' THEN 'SO' END) AS so_c,
+       COUNT (CASE WHEN year = 'JR' THEN 'JR' END) AS jr_c,
+       COUNT (CASE WHEN year = 'SR' THEN 'SR' END) AS sr_c,
+       count(state)
+  FROM benn.college_football_players
+  GROUP By state
+  ORDER BY Count(state) DESC
+-------------------------------------------------------------------------------------
+
